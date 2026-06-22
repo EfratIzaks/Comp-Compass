@@ -31,6 +31,10 @@ import {
   DEFAULT_PGY_STOCK_PRICE,
 } from "@/app/recruiter/offer-constants";
 import {
+  fetchWebSearchSalary,
+  type WebSearchSalaryUsd,
+} from "@/app/recruiter/web-search-api";
+import {
   DEFAULT_LOCATION,
   LOCATION_OPTIONS,
   YOE_OPTIONS,
@@ -133,13 +137,11 @@ export function OfferModeler({
   renderStickyTtcSummary,
   onGenerateBenchmark,
 }: OfferModelerProps) {
-  const handleSearch = onGenerateBenchmark ?? (() => {});
-
   const { currency, fxRate } = useGlobalSettings();
   const [roleName, setRoleName] = useState(MOCK_ROLE_NAME);
   const [selectedLevels, setSelectedLevels] = useState<string[]>(["L6"]);
   const [isLevelDropdownOpen, setIsLevelDropdownOpen] = useState(false);
-  const levelOptions = ["L3", "L4", "L5", "L6", "L7", "L8"];
+  const levelOptions = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"];
 
   const toggleLevel = (level: string) => {
     setSelectedLevels((prev) =>
@@ -155,8 +157,47 @@ export function OfferModeler({
   const [signingBonusUsd, setSigningBonusUsd] = useState(0);
   const [oneTimeBonusUsd, setOneTimeBonusUsd] = useState(0);
   const [showWebSearch, setShowWebSearch] = useState(false);
+  const [webSearchData, setWebSearchData] = useState<WebSearchSalaryUsd | null>(
+    null,
+  );
+  const [webSearchLoading, setWebSearchLoading] = useState(false);
+  const [webSearchError, setWebSearchError] = useState<string | null>(null);
   /** USD per share — mock 30d trailing average default; used only for RSU count estimate. */
   const [pgyStockPrice, setPgyStockPrice] = useState(DEFAULT_PGY_STOCK_PRICE);
+
+  const handleSearch = async () => {
+    onGenerateBenchmark?.();
+
+    const locationLabel =
+      LOCATION_OPTIONS.find((o) => o.value === location)?.label ?? location;
+    // YOE state holds bands like "5-7" or "15+"; convert to a single number
+    // using the lower bound (e.g. "5-7" -> 5, "15+" -> 15, "" -> 0).
+    const yoeNumber =
+      Number.parseInt(
+        (yearsExperience.split("-")[0] ?? "").replace(/[^0-9]/g, ""),
+        10,
+      ) || 0;
+
+    setWebSearchLoading(true);
+    setWebSearchError(null);
+    try {
+      const data = await fetchWebSearchSalary({
+        Title: roleName,
+        Location: locationLabel,
+        Years_of_experience: yoeNumber,
+        Level_List: selectedLevels,
+      });
+      setWebSearchData(data);
+      setShowWebSearch(true);
+    } catch (error) {
+      console.error("Workato API Error:", error);
+      setWebSearchError(
+        error instanceof Error ? error.message : "Web search failed",
+      );
+    } finally {
+      setWebSearchLoading(false);
+    }
+  };
 
   const marketNativeCurrency = useMemo(() => getLocationNativeCurrency(location), [location]);
 
@@ -673,7 +714,13 @@ export function OfferModeler({
               </label>
             </div>
             <div className="pt-2">
-              <ComparisonTable rows={percentileRowsUsd} showWebSearch={showWebSearch} />
+              <ComparisonTable
+                rows={percentileRowsUsd}
+                showWebSearch={showWebSearch}
+                webSearchData={webSearchData}
+                webSearchLoading={webSearchLoading}
+                webSearchError={webSearchError}
+              />
             </div>
           </section>
 
@@ -681,16 +728,52 @@ export function OfferModeler({
             className="space-y-6 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8"
             aria-labelledby="section-equity"
           >
-            <div>
-              <h2
-                id="section-equity"
-                className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl"
-              >
-                Equity grant
-              </h2>
-              <p className="mt-1.5 text-sm text-slate-500">
-                Annualized equity versus the internal percentile curve, then the detailed row.
-              </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+              <div>
+                <h2
+                  id="section-equity"
+                  className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl"
+                >
+                  Equity grant
+                </h2>
+                <p className="mt-1.5 text-sm text-slate-500">
+                  Annualized equity versus the internal percentile curve, then the detailed row.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">
+                <label
+                  htmlFor="pgy-share-price-equity"
+                  className="text-[10px] font-bold uppercase tracking-wide text-slate-500"
+                >
+                  PGY 30d
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    id="pgy-share-price-equity"
+                    type="number"
+                    value={pgyStockPrice}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v) && v > 0) {
+                        setPgyStockPrice(v);
+                      }
+                    }}
+                    min={0.01}
+                    step={0.01}
+                    className="w-16 rounded border border-slate-200 px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums"
+                    aria-label="PGY Share Price (30d avg) USD"
+                  />
+                  {Math.abs(pgyStockPrice - DEFAULT_PGY_STOCK_PRICE) > 1e-6 ? (
+                    <button
+                      type="button"
+                      onClick={() => setPgyStockPrice(DEFAULT_PGY_STOCK_PRICE)}
+                      className="text-[10px] font-medium text-sky-700 underline"
+                    >
+                      Reset
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             </div>
             <OfferSlider
               id="offer-equity"

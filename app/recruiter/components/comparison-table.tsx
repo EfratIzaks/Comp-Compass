@@ -1,10 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import {
-  MOCK_WEB_SEARCH_SALARY_USD,
-  type PercentileRow,
-} from "@/app/recruiter/mock-data";
+import { type PercentileRow } from "@/app/recruiter/mock-data";
 import { useGlobalSettings } from "@/app/context/global-settings";
 import { formatBaseSalaryDisplay } from "@/app/lib/money-format";
 import {
@@ -12,6 +9,7 @@ import {
   medianColumnClass,
   PercentileTransposedThead,
 } from "@/app/recruiter/percentile-transposed-table";
+import type { WebSearchSalaryUsd } from "@/app/recruiter/web-search-api";
 
 const WEB_SEARCH_SOURCES: ReadonlyArray<{ label: string; href: string }> = [
   { label: "Google Jobs", href: "https://www.google.com/search?q=salary&ibp=htl;jobs" },
@@ -22,20 +20,29 @@ const WEB_SEARCH_SOURCES: ReadonlyArray<{ label: string; href: string }> = [
 type Props = {
   rows: PercentileRow[];
   showWebSearch?: boolean;
+  /** Live web-search data; when null/undefined, cells render `—`. */
+  webSearchData?: WebSearchSalaryUsd | null;
+  webSearchLoading?: boolean;
+  webSearchError?: string | null;
 };
 
-const WEB_SEARCH_BY_PERCENTILE: Record<
-  (typeof PERCENTILE_COLUMN_ORDER)[number],
-  number
-> = {
-  25: MOCK_WEB_SEARCH_SALARY_USD.p25,
-  50: MOCK_WEB_SEARCH_SALARY_USD.p50,
-  75: MOCK_WEB_SEARCH_SALARY_USD.p75,
-  90: MOCK_WEB_SEARCH_SALARY_USD.p90,
-};
-
-export function ComparisonTable({ rows, showWebSearch = false }: Props) {
+export function ComparisonTable({
+  rows,
+  showWebSearch = false,
+  webSearchData = null,
+  webSearchLoading = false,
+  webSearchError = null,
+}: Props) {
   const { currency, fxRate } = useGlobalSettings();
+
+  const webSearchByPercentile = webSearchData
+    ? ({
+        25: webSearchData.p25,
+        50: webSearchData.p50,
+        75: webSearchData.p75,
+        90: webSearchData.p90,
+      } as Record<(typeof PERCENTILE_COLUMN_ORDER)[number], number>)
+    : null;
 
   const byPercentile = new Map(
     rows.map((r) => [r.percentile, r] as [number, PercentileRow]),
@@ -181,7 +188,7 @@ export function ComparisonTable({ rows, showWebSearch = false }: Props) {
                 </th>
                 {PERCENTILE_COLUMN_ORDER.map((pct) => {
                   const isMedian = pct === 50;
-                  const usd = WEB_SEARCH_BY_PERCENTILE[pct];
+                  const usd = webSearchByPercentile?.[pct];
                   return (
                     <td
                       key={`web-${pct}`}
@@ -193,10 +200,24 @@ export function ComparisonTable({ rows, showWebSearch = false }: Props) {
                         ].join(" "),
                       )}
                     >
-                      {formatBaseSalaryDisplay(usd, currency, fxRate)}
+                      {webSearchLoading
+                        ? "…"
+                        : usd != null
+                          ? formatBaseSalaryDisplay(usd, currency, fxRate)
+                          : "—"}
                     </td>
                   );
                 })}
+              </tr>
+            ) : null}
+            {showWebSearch && webSearchError ? (
+              <tr className="bg-rose-50/60">
+                <td
+                  colSpan={1 + PERCENTILE_COLUMN_ORDER.length}
+                  className="px-4 py-2 text-xs text-rose-700 sm:px-5"
+                >
+                  Web search failed: {webSearchError}
+                </td>
               </tr>
             ) : null}
           </tbody>

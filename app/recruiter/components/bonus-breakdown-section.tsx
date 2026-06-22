@@ -169,22 +169,7 @@ export function BonusBreakdownSection({
       <h3 className="mb-6 text-lg font-bold text-slate-900">Bonus Breakdown</h3>
       <div className="space-y-8">
         <BonusSliderRow
-          title="1. Target Discretionary (Annual)"
-          recommendedUsd={recommendedBonusUsd}
-          valueUsd={offerBonusUsd}
-          onChange={onOfferBonusChange}
-          includedInTtc
-          sliderMax={bonusMax}
-          sampleSize={856}
-          benchmarks={discretionaryBenchmarksUsd}
-          currency={currency}
-          fxRate={fxRate}
-        />
-
-        <hr className="border-slate-100" />
-
-        <BonusSliderRow
-          title="2. Signing Bonus"
+          title="1. Signing Bonus"
           recommendedUsd={recommendedSigningUsd}
           valueUsd={signingBonusUsd}
           onChange={onSigningBonusChange}
@@ -199,7 +184,7 @@ export function BonusBreakdownSection({
         <hr className="border-slate-100" />
 
         <BonusSliderRow
-          title="3. One-Time Bonus"
+          title="2. Guaranteed Bonus"
           recommendedUsd={recommendedOneTimeUsd}
           valueUsd={oneTimeBonusUsd}
           onChange={onOneTimeBonusChange}
@@ -207,6 +192,21 @@ export function BonusBreakdownSection({
           sliderMax={oneTimeMax}
           sampleSize={430}
           benchmarks={oneTimeBenchmarksUsd}
+          currency={currency}
+          fxRate={fxRate}
+        />
+
+        <hr className="border-slate-100" />
+
+        <BonusSliderRow
+          title="3. Target Discretionary (Annual)"
+          recommendedUsd={recommendedBonusUsd}
+          valueUsd={offerBonusUsd}
+          onChange={onOfferBonusChange}
+          includedInTtc
+          sliderMax={bonusMax}
+          sampleSize={856}
+          benchmarks={discretionaryBenchmarksUsd}
           currency={currency}
           fxRate={fxRate}
         />
