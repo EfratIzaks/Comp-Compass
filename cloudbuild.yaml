@@ -1,0 +1,53 @@
+# Cloud Build pipeline for Comp Compass.
+# Triggered on push to main of EfratIzaks/Comp-Compass:
+#   build the container -> push to Artifact Registry -> deploy to Cloud Run.
+substitutions:
+  _AR_REGION: us-east1
+  _RUN_REGION: us-central1
+  _REPO: comp-compass
+  _SERVICE: comp-compass
+
+steps:
+  # 1. Build the image (tagged with the commit SHA and :latest).
+  - name: gcr.io/cloud-builders/docker
+    id: build
+    args:
+      - build
+      - -t
+      - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - -t
+      - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - .
+
+  # 2. Push both tags to Artifact Registry.
+  - name: gcr.io/cloud-builders/docker
+    id: push
+    args:
+      - push
+      - --all-tags
+      - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}
+
+  # 3. Deploy the new image to Cloud Run (LB-only ingress).
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - --region=${_RUN_REGION}
+      - --ingress=internal-and-cloud-load-balancing
+      - --port=8080
+      - --allow-unauthenticated
+      - --cpu=1
+      - --memory=512Mi
+      - --min-instances=0
+      - --max-instances=4
+
+images:
+  - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+  - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
