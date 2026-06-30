@@ -3,7 +3,7 @@
 #   build the container -> push to Artifact Registry -> deploy to Cloud Run.
 substitutions:
   _AR_REGION: us-east1
-  _RUN_REGION: us-central1
+  _RUN_REGION: us-east1
   _REPO: comp-compass
   _SERVICE: comp-compass
 
@@ -40,6 +40,7 @@ steps:
       - --ingress=internal-and-cloud-load-balancing
       - --port=8080
       - --allow-unauthenticated
+      - --set-secrets=WORKATO_WEB_SEARCH_TOKEN=workato-web-search-token:latest
       - --cpu=1
       - --memory=512Mi
       - --min-instances=0
